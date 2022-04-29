@@ -1,0 +1,73 @@
+name: Update Helm Tarball
+on:
+  workflow_call:
+
+jobs:
+  update-helm-deps-tarballs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Prepare Helm
+        uses: azure/setup-helm@v1
+      
+      - name: Prepare yq
+        uses: mikefarah/yq@master
+      
+      - name: update all charts
+        run: |
+          set -eu
+          
+          for chartfile in $(find . -name Chart.yaml); do
+            chartdir=$(dirname "$chartfile")
+
+            # Skip if charts directory doesn't exist
+            depsdir="$chartdir/charts"
+            if [ ! -d "$depsdir" ]; then
+                echo "Skipping $chartfile since 'charts' directory doesn't exist"
+                continue
+            fi
+
+            deplength=$(yq '.dependencies | length' "$chartfile")
+
+            for (( i=0; i<$deplength; i++ ))
+            do
+                dep=$(yq ".dependencies[$i].name" "$chartfile")
+                version=$(yq ".dependencies[$i].version" "$chartfile")
+                args=(-d $depsdir --version $version)
+            
+                repo=$(yq ".dependencies[$i].repository" "$chartfile")
+                if [ ! -z "$repo" ]; then
+                    args+=(--repo $repo)
+                fi
+            
+                echo "Chart $chartfile : Updating $dep to $version"
+                helm pull $dep ${args[@]}
+            done
+            git add "$depsdir"
+          done
+      
+      - name: Check if an update happened
+        id: diff-check
+        continue-on-error: true
+        run: |
+          git diff --cached --exit-code
+
+      - name: setup git config
+        if: steps.diff-check.outcome == 'failure'
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+      
+      - name: commit
+        if: steps.diff-check.outcome == 'failure'
+        run: |
+          set -eux
+
+          # Stage the file, commit and push
+          git add .
+          git checkout -b "${GITHUB_HEAD_REF}"
+          git commit -m "Update Helm Tarballs"
+          git push origin "${GITHUB_HEAD_REF}"
