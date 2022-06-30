@@ -11,7 +11,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Prepare Helm
-        uses: azure/setup-helm@v1
+        uses: azure/setup-helm@v3
       
       - name: Prepare yq
         uses: mikefarah/yq@master
