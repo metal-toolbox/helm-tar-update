@@ -20,33 +20,21 @@ jobs:
         run: |
           set -eu
           
-          for chartfile in $(find . -name Chart.yaml); do
+          for chartfile in $(find . -name Chart.yaml -type f); do
             chartdir=$(dirname "$chartfile")
-
-            # Skip if charts directory doesn't exist
-            depsdir="$chartdir/charts"
-            if [ ! -d "$depsdir" ]; then
-                echo "Skipping $chartfile since 'charts' directory doesn't exist"
-                continue
-            fi
 
             deplength=$(yq '.dependencies | length' "$chartfile")
 
-            for (( i=0; i<$deplength; i++ ))
-            do
-                dep=$(yq ".dependencies[$i].name" "$chartfile")
-                version=$(yq ".dependencies[$i].version" "$chartfile")
-                args=(-d $depsdir --version $version)
+            if [ "$deplength" -gt "0" ]; then
+               pushd "$chartdir"
+               helm dependency update
+               popd
+            else
+               echo "Skipping $chartfile since no dependencies were found."
+               continue
+            fi
             
-                repo=$(yq ".dependencies[$i].repository" "$chartfile")
-                if [ ! -z "$repo" ]; then
-                    args+=(--repo $repo)
-                fi
-            
-                echo "Chart $chartfile : Updating $dep to $version"
-                helm pull $dep ${args[@]}
-            done
-            git add "$depsdir"
+            git add "${chartdir}"
           done
       
       - name: Check if an update happened
