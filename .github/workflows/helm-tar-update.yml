@@ -12,6 +12,9 @@ jobs:
 
       - name: Prepare Helm
         uses: azure/setup-helm@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+        
       
       - name: Prepare yq
         uses: mikefarah/yq@master
