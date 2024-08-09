@@ -44,7 +44,7 @@ jobs:
         id: diff-check
         continue-on-error: true
         run: |
-          git diff --cached --exit-code
+          git diff --cached --exit-code ':(exclude)Chart.lock'
 
       - name: setup git config
         if: steps.diff-check.outcome == 'failure'
